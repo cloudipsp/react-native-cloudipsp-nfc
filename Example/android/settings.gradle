@@ -1,0 +1,8 @@
+include ':app'
+
+include ':react-native-cloudipsp-nfc'
+project(':react-native-cloudipsp-nfc').projectDir = new File(
+        rootProject.projectDir,
+        '../../android/library'
+//        '../node_modules/react-native-cloudipsp-nfc/android'
+)
