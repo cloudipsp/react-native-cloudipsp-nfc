@@ -12,10 +12,15 @@ import android.nfc.NfcAdapter;
 import android.nfc.Tag;
 import android.nfc.tech.IsoDep;
 import android.os.Build;
+import android.provider.Settings;
 import android.util.Base64;
 
+import com.facebook.react.bridge.Promise;
+import com.facebook.react.bridge.PromiseImpl;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
+import com.facebook.react.bridge.ReactMethod;
+import com.facebook.react.bridge.WritableNativeMap;
 import com.github.devnied.emvnfccard.exception.CommunicationException;
 import com.github.devnied.emvnfccard.model.EmvCard;
 import com.github.devnied.emvnfccard.parser.EmvParser;
@@ -37,16 +42,74 @@ public class CloudipspNfcReactModule extends ReactContextBaseJavaModule {
     private static final String ACTION = NfcAdapter.ACTION_TECH_DISCOVERED;
     private static final String ERR_TAG = "CloudipspNFC: ";
 
+    private final NfcAdapter adapter;
+    private Promise subscribbed;
+    private CardInfo cardInfo;
+    static CloudipspNfcReactModule instance;
+
     public CloudipspNfcReactModule(ReactApplicationContext context) {
         super(context);
 
         checkPermission(context);
         checkMetaData(context, getActivities(context));
+
+        adapter = NfcAdapter.getDefaultAdapter(context);
+        instance = this;
     }
 
     @Override
     public String getName() {
-        return "react-native-cloudipsp-nfc";
+        return "CloudipspNfc";
+    }
+
+    @ReactMethod
+    public void isSupporting(Promise promise) {
+        promise.resolve(adapter != null);
+    }
+
+    @ReactMethod
+    public void isEnabled(Promise promise) {
+        if (adapter == null) {
+            promise.resolve(false);
+        } else {
+            promise.resolve(adapter.isEnabled());
+        }
+    }
+
+    @ReactMethod
+    public void enable(Promise promise) {
+        final Intent intent;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+            intent = new Intent(Settings.ACTION_NFC_SETTINGS);
+        } else {
+            intent = new Intent(Settings.ACTION_WIRELESS_SETTINGS);
+        }
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            getReactApplicationContext().startActivity(intent);
+            promise.resolve(true);
+        } catch (Exception e) {
+            promise.reject(e);
+        }
+    }
+
+    @ReactMethod
+    public void subscribe(Promise promise) {
+        subscribbed = promise;
+        notifySubscription();
+    }
+
+    private void notifySubscription() {
+        if (subscribbed != null && cardInfo != null) {
+            final WritableNativeMap map = new WritableNativeMap();
+            map.putString("cardNumber", cardInfo.cardNumber);
+            map.putInt("expMm", cardInfo.expMm);
+            map.putInt("expYy", cardInfo.expYy);
+            subscribbed.resolve(map);
+
+            cardInfo = null;
+            subscribbed = null;
+        }
     }
 
     private static void checkPermission(Context context) {
@@ -118,7 +181,7 @@ public class CloudipspNfcReactModule extends ReactContextBaseJavaModule {
         throw new RuntimeException(ERR_TAG + "MetaInfo with \n\"" + resource + "\" must be set for " + activities[0]);
     }
 
-    public boolean readCard(Intent intent) {
+    boolean readCard(Intent intent) {
         if (ACTION.equals(intent.getAction())) {
             final Tag tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG);
             if (tag != null) {
@@ -145,9 +208,12 @@ public class CloudipspNfcReactModule extends ReactContextBaseJavaModule {
                 }
 
                 try {
-//                            emvCard.getCardNumber(),
-//                            String.valueOf(emvCard.getExpireDate().getMonth()+1),
-//                            String.valueOf(emvCard.getExpireDate().getYear()-100),
+                    cardInfo = new CardInfo(
+                            emvCard.getCardNumber(),
+                            emvCard.getExpireDate().getMonth() + 1,
+                            emvCard.getExpireDate().getYear() - 100
+                    );
+                    notifySubscription();
                     return true;
                 } catch (Exception e) {
                     throw new RuntimeException(e);
@@ -200,5 +266,16 @@ public class CloudipspNfcReactModule extends ReactContextBaseJavaModule {
         }
 
         return Base64.encodeToString(kkh.toString().getBytes(), Base64.DEFAULT);
+    }
+
+    private static class CardInfo {
+        public final String cardNumber;
+        public final int expMm, expYy;
+
+        private CardInfo(String cardNumber, int expMm, int expYy) {
+            this.cardNumber = cardNumber;
+            this.expMm = expMm;
+            this.expYy = expYy;
+        }
     }
 }

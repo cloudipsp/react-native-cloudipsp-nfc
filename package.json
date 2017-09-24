@@ -2,7 +2,7 @@
   "name": "react-native-cloudipsp-nfc",
   "version": "0.0.1",
   "description": "Library for accepting NFC payments directly from android applications.",
-  "main": "lib/main.js",
+  "main": "lib/index.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/cloudipsp/react-native-cloudipsp-nfc.git"
@@ -21,6 +21,6 @@
   },
   "homepage": "https://cloudipsp.com",
   "dependencies": {
-    "react-native-cloudipsp": "^0.0.5"
+    "react-native-cloudipsp": "file:../reactnativecloudipsp"
   }
 }

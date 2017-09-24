@@ -20,13 +20,14 @@ import {
     Failure,
     Cloudipsp,
     CardInput,
-    CardLayout,
     CardFieldNumber,
     CardFieldExpMm,
     CardFieldExpYy,
     CardFieldCvv,
     CloudipspWebView
 } from 'react-native-cloudipsp';
+
+import CloudipspNfc from 'react-native-cloudipsp-nfc';
 
 class ExampleApp extends React.Component {
     constructor(props) {
@@ -39,6 +40,24 @@ class ExampleApp extends React.Component {
             description: 'test payment :)',
             mode: 'entry'
         };
+    }
+
+    componentDidMount() {
+        CloudipspNfc.isSupporting()
+            .then(() => {
+                return CloudipspNfc.isEnabled();
+            })
+            .then((enabled) => {
+                if (enabled) {
+                    CloudipspNfc.subscribe()
+                        .then((bridge) => {
+                            this.nfcCardBridge = bridge;
+                            bridge.displayCard(this.refs.cardInput);
+                        })
+                } else {
+                    CloudipspNfc.enable();
+                }
+            })
     }
 
     test = () => {
@@ -56,7 +75,13 @@ class ExampleApp extends React.Component {
 
 
         let order = new Order(Number(this.state.amount), Currency[this.state.ccy], 'rn_' + Math.random(), this.state.description, this.state.email);
-        let card = cardForm.getCard();
+        let card;
+        if (this.nfcCardBridge) {
+            card = this.nfcCardBridge.getCard(order);
+            delete this.nfcCardBridge;
+        } else {
+            card = cardForm.getCard();
+        }
 
         console.log('this: ' + JSON.stringify(card));
         if (!card.isValidCardNumber()) {
@@ -89,9 +114,9 @@ class ExampleApp extends React.Component {
                     ref="cloudipspWebView"
                     decelerationRate="normal"
                     onError={(error) => {
-                        console.log('webViewError:'+ JSON.stringify(error));
+                        console.log('webViewError:' + JSON.stringify(error));
                     }}
-                    style={{flex:1}}
+                    style={{flex: 1}}
                 />
             );
         } else {
@@ -101,168 +126,86 @@ class ExampleApp extends React.Component {
 
 
     renderScreen() {
-        if (this.state.mode == 'entry') {
-            return this.renderModes();
-        } else {
-            return (<ScrollView style={{flex: 1}}>
-                <View
-                    style={{padding:20, flex: 1}}>
-                    <TouchableOpacity onPress={() => {
-                        this.setState({mode: 'entry'});
-                    }}>
-                        <Text style={styles.simpleText}>{'< Modes'}</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity onPress={this.test} style={{marginTop: 20}}>
-                        <Text style={styles.simpleText}>Amount:</Text>
-                    </TouchableOpacity>
-                    <TextInput
-                        value={this.state.amount}
-                        maxLength={7}
-                        keyboardType='numeric'
-                        onChangeText={(text) => {
-                                this.setState({amount:text});
-                            }}
-                        onSubmitEditing={(event) => {
-                                this.refs.inputEmail.focus();
-                            }}
-                        style={styles.simpleTextInput}
-                    />
-                    <Text style={styles.simpleText}>Currency:</Text>
-                    <Picker
-                        selectedValue={this.state.ccy}
-                        onValueChange={(value) => {
-                                this.setState({ccy:value});
-                            }}>
-
-                        <Picker.Item label="UAH" value="UAH"/>
-                        <Picker.Item label="USD" value="USD"/>
-                        <Picker.Item label="EUR" value="EUR"/>
-                        <Picker.Item label="GBP" value="GBP"/>
-                        <Picker.Item label="RUR" value="RUR"/>
-                    </Picker>
-                    <Text style={styles.simpleText}>Email:</Text>
-                    <TextInput
-                        ref="inputEmail"
-                        value={this.state.email}
-                        keyboardType='email-address'
-                        onChangeText={(text) => {
-                                this.setState({email:text});
-                            }}
-                        onSubmitEditing={(event) => {
-                                this.refs.inputDescription.focus();
-                            }}
-                        style={styles.simpleTextInput}
-                    />
-                    <Text style={styles.simpleText}>Description:</Text>
-                    <TextInput
-                        ref="inputDescription"
-                        value={this.state.description}
-                        onChangeText={(text) => {
-                                this.setState({description:text});
-                            }}
-                        onSubmitEditing={(event) => {
-                                this.refs.cardInput.focus();
-                            }}
-                        style={styles.simpleTextInput}
-                    />
-                    {this.renderCardForm()}
-                </View>
-            </ScrollView>);
-        }
-    }
-
-    renderModes() {
-        return (<View style={{flex:1, alignItems: 'center', justifyContent: 'center'}}>
-            <View>
-                <TouchableOpacity
-                    onPress={() => {
-                        this.setState({mode: 'default'});
-                    }}>
-                    <Text>Default Example</Text>
+        return (<ScrollView style={{flex: 1}}>
+            <View
+                style={{padding: 20, flex: 1}}>
+                <TouchableOpacity onPress={this.test}>
+                    <Text style={styles.simpleText}>Amount:</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                    onPress={() => {
-                        this.setState({mode: 'flexible'});
+                <TextInput
+                    value={this.state.amount}
+                    maxLength={7}
+                    keyboardType='numeric'
+                    onChangeText={(text) => {
+                        this.setState({amount: text});
                     }}
-                    style={{marginTop: 10}}>
-                    <Text>Flexible Example</Text>
-                </TouchableOpacity>
+                    onSubmitEditing={(event) => {
+                        this.refs.inputEmail.focus();
+                    }}
+                    style={styles.simpleTextInput}
+                />
+                <Text style={styles.simpleText}>Currency:</Text>
+                <Picker
+                    selectedValue={this.state.ccy}
+                    onValueChange={(value) => {
+                        this.setState({ccy: value});
+                    }}>
+
+                    <Picker.Item label="UAH" value="UAH"/>
+                    <Picker.Item label="USD" value="USD"/>
+                    <Picker.Item label="EUR" value="EUR"/>
+                    <Picker.Item label="GBP" value="GBP"/>
+                    <Picker.Item label="RUR" value="RUR"/>
+                </Picker>
+                <Text style={styles.simpleText}>Email:</Text>
+                <TextInput
+                    ref="inputEmail"
+                    value={this.state.email}
+                    keyboardType='email-address'
+                    onChangeText={(text) => {
+                        this.setState({email: text});
+                    }}
+                    onSubmitEditing={(event) => {
+                        this.refs.inputDescription.focus();
+                    }}
+                    style={styles.simpleTextInput}
+                />
+                <Text style={styles.simpleText}>Description:</Text>
+                <TextInput
+                    ref="inputDescription"
+                    value={this.state.description}
+                    onChangeText={(text) => {
+                        this.setState({description: text});
+                    }}
+                    onSubmitEditing={(event) => {
+                        this.refs.cardInput.focus();
+                    }}
+                    style={styles.simpleTextInput}
+                />
+                {this.renderCardForm()}
             </View>
-        </View>);
+        </ScrollView>);
     }
 
     renderCardForm() {
-        if (this.state.mode == 'default') {
-            return (
-                <View>
-                    <Text>Default card view</Text>
+        return (
+            <View>
+                <Text>Default card view</Text>
 
-                    <CardInput
-                        ref='cardInput'
-                        debug={true}
-                        textStyle={styles.simpleText}
-                        textInputStyle={styles.simpleTextInput}
-                    />
-                    <TouchableOpacity onPress={() => {
-                        this.pay(this.refs.cardInput);
-                    }}>
-                        <Text
-                            style={{textAlign:'center', marginTop : 12, borderWidth: 1, borderColor: '#999999',}}>Pay</Text>
-                    </TouchableOpacity>
-                </View>);
-        } else {
-            return (<CardLayout ref='cardLayout'>
-                <Text style={{marginVertical: 20}}>Card form layout. Cvv and expirity field were swapped</Text>
-                <Text
-                    onPress={() => {
-                        this.refs.cardLayout.test();
-                    }}>
-                    Card Number:
-                </Text>
-                <CardFieldNumber
-                    ref="inputNumber"
-                    onSubmitEditing={() => {
-                        this.refs.inputCvv.focus();
-                    }}
+                <CardInput
+                    ref='cardInput'
+                    debug={true}
+                    textStyle={styles.simpleText}
+                    textInputStyle={styles.simpleTextInput}
                 />
-                <Text style={this.props.textStyle}>CVV:</Text>
-                <CardFieldCvv
-                    ref="inputCvv"
-                    onSubmitEditing={() => {
-                            this.refs.inputMm.focus();
-                    }}
-                />
-                <Text style={this.props.textStyle}>Expiry:</Text>
-                <View style={{flexDirection: 'row'}}>
-                    <CardFieldExpMm
-                        ref="inputMm"
-                        style={{flex: 1}}
-                        placeholder='MM'
-                        onSubmitEditing={() => {
-                            this.refs.inputYy.focus();
-                        }}
-                    />
-                    <CardFieldExpYy
-                        ref="inputYy"
-                        style={{flex: 1}}
-                        placeholder='YY'
-                        onSubmitEditing={() => {
-                            if (this.props.onCompletion != undefined) {
-                                this.props.onCompletion(this);
-                            }
-                        }}
-                    />
-                </View>
                 <TouchableOpacity onPress={() => {
-                        this.pay(this.refs.cardLayout);
-                    }}>
+                    this.pay(this.refs.cardInput);
+                }}>
                     <Text
-                        style={{textAlign:'center', marginTop : 12, borderWidth: 1, borderColor: '#999999'}}>Pay</Text>
+                        style={{textAlign: 'center', marginTop: 12, borderWidth: 1, borderColor: '#999999',}}>Pay</Text>
                 </TouchableOpacity>
-            </CardLayout>);
-        }
-    }
+            </View>);
+    };
 }
 
 var styles = StyleSheet.create({
