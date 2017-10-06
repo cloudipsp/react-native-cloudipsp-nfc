@@ -21,6 +21,6 @@
   },
   "homepage": "https://cloudipsp.com",
   "dependencies": {
-    "react-native-cloudipsp": "file:../reactnativecloudipsp"
+    "react-native-cloudipsp": "0.0.6"
   }
 }

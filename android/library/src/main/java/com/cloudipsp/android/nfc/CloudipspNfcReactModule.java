@@ -12,6 +12,8 @@ import android.nfc.NfcAdapter;
 import android.nfc.Tag;
 import android.nfc.tech.IsoDep;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.util.Base64;
 
@@ -43,9 +45,11 @@ public class CloudipspNfcReactModule extends ReactContextBaseJavaModule {
     private static final String ERR_TAG = "CloudipspNFC: ";
 
     private final NfcAdapter adapter;
+    private static final Handler main = new Handler(Looper.getMainLooper());
     private Promise subscribbed;
     private CardInfo cardInfo;
     static CloudipspNfcReactModule instance;
+    private String kkhCached;
 
     public CloudipspNfcReactModule(ReactApplicationContext context) {
         super(context);
@@ -109,6 +113,66 @@ public class CloudipspNfcReactModule extends ReactContextBaseJavaModule {
 
             cardInfo = null;
             subscribbed = null;
+        }
+    }
+
+    @ReactMethod
+    public void kkh(final Promise promise) {
+        if (kkhCached == null) {
+            final Context context = getReactApplicationContext();
+
+            new Thread() {
+                @Override
+                public void run() {
+                    try {
+                        final JSONObject kkhJson = new JSONObject();
+                        kkhJson.put("id", InstanceID.getInstance(context).getId().hashCode());
+
+                        final JSONObject data = new JSONObject();
+                        data.put("board", Build.BOARD);
+                        data.put("bootloader", Build.BOOTLOADER);
+                        data.put("brand", Build.BRAND);
+                        data.put("device", Build.DEVICE);
+                        data.put("display", Build.DISPLAY);
+                        data.put("fingerprint", Build.FINGERPRINT);
+                        data.put("hardware", Build.HARDWARE);
+                        data.put("host", Build.HOST);
+                        data.put("id", Build.ID);
+                        data.put("manufacturer", Build.MANUFACTURER);
+                        data.put("model", Build.MODEL);
+                        data.put("product", Build.PRODUCT);
+                        data.put("os_version", Build.VERSION.CODENAME);
+                        data.put("os_release", Build.VERSION.RELEASE);
+
+                        final String appPackage = context.getPackageName();
+                        data.put("app_package", appPackage);
+                        final PackageInfo info;
+                        info = context.getPackageManager().getPackageInfo(appPackage, 0);
+
+                        data.put("app_version_code", info.versionCode);
+                        data.put("app_version_name", info.versionName);
+                        data.put("app_name", info.applicationInfo.name);
+
+                        kkhJson.put("data", data);
+                        kkhCached = Base64.encodeToString(kkhJson.toString().getBytes(), Base64.DEFAULT);
+                        main.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                promise.resolve(kkhCached);
+                            }
+                        });
+                    } catch (final Exception e) {
+                        main.post(new Runnable() {
+                            @Override
+                            public void run() {
+                                promise.reject(e);
+                            }
+                        });
+                    }
+                }
+            }.start();
+        } else {
+            promise.resolve(kkhCached);
         }
     }
 
@@ -222,50 +286,6 @@ public class CloudipspNfcReactModule extends ReactContextBaseJavaModule {
         }
 
         return false;
-    }
-
-    private String kkh() {
-        final JSONObject kkh = new JSONObject();
-        final Context context = getReactApplicationContext();
-
-        try {
-            kkh.put("id", InstanceID.getInstance(context).getId().hashCode());
-
-            final JSONObject data = new JSONObject();
-            data.put("board", Build.BOARD);
-            data.put("bootloader", Build.BOOTLOADER);
-            data.put("brand", Build.BRAND);
-            data.put("device", Build.DEVICE);
-            data.put("display", Build.DISPLAY);
-            data.put("fingerprint", Build.FINGERPRINT);
-            data.put("hardware", Build.HARDWARE);
-            data.put("host", Build.HOST);
-            data.put("id", Build.ID);
-            data.put("manufacturer", Build.MANUFACTURER);
-            data.put("model", Build.MODEL);
-            data.put("product", Build.PRODUCT);
-            data.put("os_version", Build.VERSION.CODENAME);
-            data.put("os_release", Build.VERSION.RELEASE);
-
-            final String appPackage = context.getPackageName();
-            data.put("app_package", appPackage);
-            final PackageInfo info;
-            try {
-                info = context.getPackageManager().getPackageInfo(appPackage, 0);
-            } catch (PackageManager.NameNotFoundException e) {
-                throw new RuntimeException(e);
-            }
-
-            data.put("app_version_code", info.versionCode);
-            data.put("app_version_name", info.versionName);
-            data.put("app_name", info.applicationInfo.name);
-
-            kkh.put("data", data);
-        } catch (JSONException e) {
-            throw new RuntimeException(e);
-        }
-
-        return Base64.encodeToString(kkh.toString().getBytes(), Base64.DEFAULT);
     }
 
     private static class CardInfo {
